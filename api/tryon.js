@@ -5,10 +5,21 @@ export default async function handler(req, res) {
   try {
     const response = await fetch('https://api.fashn.ai/v1/run', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model_image: modelImage, garment_image: garmentImage, category, mode: 'balanced' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model_name: 'tryon-v1.6',
+        inputs: {
+          model_image: modelImage,
+          garment_image: garmentImage,
+          return_base64: true
+        }
+      }),
     });
     const data = await response.json();
+    if (!data.id) return res.status(500).json({ error: 'No prediction ID returned' });
     const predId = data.id;
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 3000));
