@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { apiKey, modelImage, garmentImage, category } = req.body;
+  const { modelImage, garmentImage, category } = req.body;
+  const apiKey = process.env.FASHN_API_KEY;
   try {
     const response = await fetch('https://api.fashn.ai/v1/run', {
       method: 'POST',
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
       if (stData.status === 'failed') return res.status(500).json({ error: 'Render failed' });
     }
     res.status(500).json({ error: 'Timed out' });
-  } catch (e) {
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 }
