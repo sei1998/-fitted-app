@@ -7,22 +7,16 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
 body{background:#050208;overflow-x:hidden;font-family:'Raleway',sans-serif}
-:root{
-  --void:#050208;--glass:rgba(255,255,255,0.04);--glass-b:rgba(255,255,255,0.08);
-  --white:#f8f4ff;--silver:#c8c0d8;--crimson:#7a1525;--crimson-lt:#9e1e30;
-  --chrome:linear-gradient(135deg,#f0eaff 0%,#9890a8 50%,#f0eaff 100%);
-}
-.grain{position:fixed;inset:0;pointer-events:none;z-index:9997;opacity:0.4;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:9997;
+background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");}
 .diamond{position:fixed;inset:0;pointer-events:none;z-index:9996;
-  background-image:linear-gradient(45deg,rgba(220,210,240,0.04) 1px,transparent 1px),linear-gradient(-45deg,rgba(220,210,240,0.04) 1px,transparent 1px);
-  background-size:28px 28px;}
+background-image:linear-gradient(45deg,rgba(220,210,240,0.04) 1px,transparent 1px),linear-gradient(-45deg,rgba(220,210,240,0.04) 1px,transparent 1px);
+background-size:28px 28px;}
 </style>
 </head>
 <body>
@@ -33,7 +27,13 @@ body{background:#050208;overflow-x:hidden;font-family:'Raleway',sans-serif}
 
 const { useState, useRef, useEffect } = React;
 
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://zwbusnhlhzagafoqxqzh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9wdZD_iOU_TXuE1fSb2Uqg_RrzhK2Y4';
+const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const FREE_LIMIT = 3;
+
 const CATEGORY_OPTIONS = [
   {id:"top",label:"Top / Shirt",icon:"👕"},
   {id:"bottom",label:"Bottom / Skirt",icon:"👖"},
@@ -44,25 +44,48 @@ const CATEGORY_OPTIONS = [
   {id:"headwear",label:"Hat / Headwear",icon:"🧢"},
   {id:"swimwear",label:"Swimwear / Lingerie",icon:"👙"},
 ];
+
 const PLACEMENT_OPTIONS = [
   "Auto-detect","Full body","Upper body","Lower body",
   "Left wrist","Right wrist","Both wrists","Neck",
   "Left ear","Right ear","Both ears","Shoulders",
   "Feet","Left hand","Right hand","Waist","Head",
 ];
+
 const PACKS = [
-  {id:"p1",looks:1,price:1.49,label:"1 Look — £1.49"},
-  {id:"p5",looks:5,price:5.99,label:"5 Looks — £5.99"},
-  {id:"p15",looks:15,price:14.99,label:"15 Looks — £14.99"},
+  {id:"p1",looks:1,price:1.49,label:"1 Look"},
+  {id:"p5",looks:5,price:5.99,label:"5 Looks"},
+  {id:"p15",looks:15,price:14.99,label:"15 Looks"},
 ];
-const PHOTO_TIPS = [
-  {good:true,text:"Full body photo, head to toe"},
-  {good:true,text:"Fitted clothes — shows your shape"},
-  {good:true,text:"Face the camera straight on"},
-  {good:true,text:"Good lighting, plain background"},
-  {good:false,text:"No baggy or oversized clothing"},
-  {good:false,text:"No heavy coats or bulky layers"},
-  {good:false,text:"No cropped or cut-off photos"},
+
+const PHOTO_GOOD = [
+  "Full body — head to toe visible",
+  "Fitted clothes showing your shape",
+  "Facing the camera straight on",
+  "Plain background — white wall ideal",
+  "Good lighting — natural light best",
+];
+
+const PHOTO_BAD = [
+  "Baggy or oversized clothing",
+  "Busy or cluttered background",
+  "Cropped — must show full body",
+  "Side angles or looking away",
+  "Dark or shadowy lighting",
+];
+
+const GARMENT_GOOD = [
+  "Flat lay product image",
+  "Item on a real model",
+  "Clear white or plain background",
+  "Full item visible in frame",
+];
+
+const GARMENT_BAD = [
+  "Mannequin only — torso no head",
+  "Blurry or low quality image",
+  "Heavily cropped item",
+  "Multiple items in one image",
 ];
 
 const css = `
@@ -70,21 +93,73 @@ const css = `
   .hdr{position:sticky;top:0;z-index:100;height:64px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;background:rgba(5,2,8,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);}
   .logo{font-family:'Playfair Display',serif;font-size:1.6rem;cursor:pointer;display:flex;align-items:baseline;gap:1px;}
   .logo-m{background:linear-gradient(135deg,#f0eaff,#b0a8c0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;letter-spacing:4px;}
-  .logo-a{background:linear-gradient(135deg,#9e1e30,#6b0f20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-style:italic;font-weight:400;}
-  .chip{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:6px 14px;font-size:0.58rem;letter-spacing:2px;color:#c8c0d8;text-transform:uppercase;cursor:pointer;}
+  .logo-a{background:linear-gradient(135deg,#9e1e30,#6b0f20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-style:italic;}
+  .hdr-r{display:flex;align-items:center;gap:10px;}
+  .chip{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:6px 14px;font-size:0.58rem;letter-spacing:2px;color:#c8c0d8;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
   .chip em{color:#9e1e30;font-style:normal;}
+  .chip:hover{background:rgba(255,255,255,0.07);}
+  .avatar-chip{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid rgba(200,192,216,0.3);cursor:pointer;}
   .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(5,2,8,0.6);backdrop-filter:blur(10px);position:sticky;top:64px;z-index:99;overflow-x:auto;}
   .tabs::-webkit-scrollbar{display:none;}
-  .tab{flex:1;min-width:90px;padding:13px 8px;background:transparent;border:none;color:#3a3550;font-family:'Raleway',sans-serif;font-size:0.56rem;letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;transition:color 0.2s;white-space:nowrap;}
+  .tab{flex:1;min-width:80px;padding:13px 8px;background:transparent;border:none;color:#3a3550;font-family:'Raleway',sans-serif;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:color 0.2s;white-space:nowrap;}
   .tab:hover{color:#c8c0d8;}
   .tab.on{color:#f8f4ff;border-bottom:1px solid rgba(200,192,216,0.4);}
   .wrap{padding:24px 20px 120px;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:18px;}
-  .hero{text-align:center;padding:40px 0 20px;display:flex;flex-direction:column;align-items:center;gap:20px;}
-  .hero-t{font-family:'Playfair Display',serif;font-size:clamp(2.8rem,10vw,5rem);font-weight:400;line-height:1.1;}
-  .hero-t em{font-style:italic;background:linear-gradient(135deg,#f0eaff 0%,#9890a8 50%,#f0eaff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-  .hero-s{font-size:0.68rem;letter-spacing:4px;color:rgba(200,192,216,0.4);text-transform:uppercase;}
-  .btn-w{display:flex;flex-direction:column;gap:10px;width:100%;}
+  .chrome-line{height:1px;background:linear-gradient(90deg,transparent,rgba(200,192,216,0.15),transparent);}
+  .eyebrow{font-size:0.52rem;letter-spacing:5px;color:rgba(200,192,216,0.3);text-transform:uppercase;margin-bottom:6px;}
+  .sec-t{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:400;}
+  .sec-t em{font-style:italic;color:rgba(200,192,216,0.7);}
+
+  /* AUTH */
+  .auth-wrap{min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
+  .auth-box{width:100%;max-width:400px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px 28px;}
+  .auth-t{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:400;margin-bottom:6px;}
+  .auth-t em{font-style:italic;color:#c8c0d8;}
+  .auth-s{font-size:0.65rem;letter-spacing:1.5px;color:#3a3550;line-height:1.9;margin-bottom:24px;}
+  .auth-inp{width:100%;background:rgba(5,2,8,0.7);border:1px solid #1e1a2a;border-radius:12px;color:#f8f4ff;font-family:'Raleway',sans-serif;font-size:0.8rem;padding:14px 16px;outline:none;margin-bottom:12px;}
+  .auth-inp:focus{border-color:#c8c0d8;}
+  .auth-inp::placeholder{color:#2e2a3a;}
+  .auth-err{font-size:0.62rem;color:#9e1e30;letter-spacing:1px;margin-bottom:12px;}
+  .auth-switch{text-align:center;font-size:0.62rem;color:#3a3550;margin-top:14px;letter-spacing:1px;}
+  .auth-switch button{background:transparent;border:none;color:#c8c0d8;cursor:pointer;font-size:0.62rem;letter-spacing:1px;text-decoration:underline;}
+
+  /* AVATAR SETUP */
+  .setup-wrap{padding:24px 20px 60px;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+  .setup-step{font-size:0.52rem;letter-spacing:4px;color:#9e1e30;text-transform:uppercase;}
+  .guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .guide-card{border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;}
+  .guide-card.good{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);}
+  .guide-card.bad{background:rgba(122,21,37,0.06);border:1px solid rgba(158,30,48,0.15);}
+  .guide-head{font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;font-weight:600;}
+  .guide-card.good .guide-head{color:#c8c0d8;}
+  .guide-card.bad .guide-head{color:#9e1e30;}
+  .guide-item{display:flex;align-items:flex-start;gap:8px;font-size:0.65rem;color:#6a6080;line-height:1.6;}
+  .guide-ic{flex-shrink:0;font-size:0.65rem;margin-top:2px;}
+  .guide-card.good .guide-ic{color:#c8c0d8;}
+  .guide-card.bad .guide-ic{color:#9e1e30;opacity:0.7;}
+  .example-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .example-box{aspect-ratio:2/3;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+  .example-box.good-ex{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);}
+  .example-box.bad-ex{background:rgba(122,21,37,0.05);border:1px solid rgba(158,30,48,0.15);}
+  .ex-icon{font-size:2.5rem;opacity:0.2;}
+  .ex-label{font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;}
+  .example-box.good-ex .ex-label{color:#c8c0d8;}
+  .example-box.bad-ex .ex-label{color:#9e1e30;}
+  .ex-tips{font-size:0.58rem;color:#3a3550;text-align:center;padding:0 12px;line-height:1.7;}
+
+  /* AVATAR UPLOAD */
+  .avatar-upload{width:100%;aspect-ratio:3/4;border-radius:18px;border:1px dashed rgba(200,192,216,0.15);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;cursor:pointer;position:relative;overflow:hidden;background:rgba(0,0,0,0.3);transition:all 0.2s;}
+  .avatar-upload:hover{border-color:rgba(200,192,216,0.3);}
+  .avatar-upload img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .avatar-upload-ov{position:absolute;inset:0;background:rgba(5,2,8,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;opacity:0;transition:opacity 0.2s;}
+  .avatar-upload:hover .avatar-upload-ov{opacity:1;}
+  .up-plus{font-size:2.5rem;color:rgba(200,192,216,0.15);}
+  .up-hint{font-size:0.6rem;letter-spacing:2px;color:#3a3550;text-transform:uppercase;}
+
+  /* BUTTONS */
   .btn-p{width:100%;padding:17px 24px;background:linear-gradient(135deg,#f0eaff,#c8c0d8);color:#050208;border:none;border-radius:100px;font-family:'Raleway',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:5px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+  .btn-p::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);transform:translateX(-100%);animation:shim 2.8s infinite;}
+  @keyframes shim{to{transform:translateX(100%);}}
   .btn-p:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(200,192,216,0.2);}
   .btn-p:disabled{opacity:0.3;cursor:not-allowed;transform:none;}
   .btn-c{width:100%;padding:17px 24px;background:linear-gradient(135deg,#8b1a2e,#6b0f20);color:rgba(240,234,255,0.9);border:none;border-radius:100px;font-family:'Raleway',sans-serif;font-weight:500;font-size:0.72rem;letter-spacing:5px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;box-shadow:0 0 32px rgba(122,21,37,0.2);}
@@ -92,23 +167,27 @@ const css = `
   .btn-c:disabled{opacity:0.3;cursor:not-allowed;transform:none;}
   .btn-g{width:100%;padding:15px 24px;background:rgba(255,255,255,0.04);color:#c8c0d8;border:1px solid rgba(255,255,255,0.08);border-radius:100px;font-family:'Raleway',sans-serif;font-size:0.68rem;letter-spacing:3px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;}
   .btn-g:hover{background:rgba(255,255,255,0.07);color:#f8f4ff;}
-  .gc{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(20px);border-radius:16px;}
+
+  /* HOME */
+  .hero{text-align:center;padding:40px 0 20px;display:flex;flex-direction:column;align-items:center;gap:20px;}
+  .hero-t{font-family:'Playfair Display',serif;font-size:clamp(2.8rem,10vw,5rem);font-weight:400;line-height:1.1;}
+  .hero-t em{font-style:italic;background:linear-gradient(135deg,#f0eaff 0%,#9890a8 50%,#f0eaff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .hero-s{font-size:0.68rem;letter-spacing:4px;color:rgba(200,192,216,0.4);text-transform:uppercase;}
   .p-row{display:flex;flex-direction:column;gap:8px;}
-  .p-card{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-radius:14px;cursor:pointer;transition:all 0.2s;}
-  .p-card:hover{background:rgba(255,255,255,0.06);}
+  .p-card{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-radius:14px;cursor:pointer;transition:all 0.2s;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);}
+  .p-card:hover{background:rgba(255,255,255,0.07);}
   .p-card.feat{background:rgba(122,21,37,0.08);border:1px solid rgba(158,30,48,0.2)!important;}
   .p-nm{font-family:'Raleway',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:2px;text-transform:uppercase;}
   .p-ds{font-size:0.58rem;letter-spacing:1px;color:#3a3550;margin-top:3px;}
   .p-pr{font-family:'Playfair Display',serif;font-size:1.15rem;color:#c8c0d8;}
   .p-pr small{font-size:0.58rem;color:#3a3550;}
   .badge{font-size:0.46rem;letter-spacing:2px;background:rgba(122,21,37,0.2);border:1px solid rgba(158,30,48,0.3);border-radius:100px;padding:3px 10px;color:#9e1e30;margin-left:8px;text-transform:uppercase;}
-  .chrome-line{height:1px;background:linear-gradient(90deg,transparent,rgba(200,192,216,0.15),transparent);}
-  .eyebrow{font-size:0.52rem;letter-spacing:5px;color:rgba(200,192,216,0.3);text-transform:uppercase;margin-bottom:6px;}
-  .sec-t{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:400;}
-  .sec-t em{font-style:italic;color:rgba(200,192,216,0.7);}
+
+  /* BUILD */
   .photo-frame{width:100%;aspect-ratio:3/5;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,0.08);}
   .photo-frame img{width:100%;height:100%;object-fit:cover;}
   .chg-btn{position:absolute;bottom:14px;right:14px;background:rgba(5,2,8,0.85);border:1px solid rgba(255,255,255,0.08);color:#c8c0d8;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;padding:8px 14px;border-radius:100px;cursor:pointer;}
+  .no-avatar-box{width:100%;aspect-ratio:3/5;border-radius:18px;background:rgba(122,21,37,0.06);border:1px solid rgba(158,30,48,0.15);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;}
   .oi{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;}
   .oi img{width:50px;height:50px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.08);flex-shrink:0;}
   .oi-info{flex:1;min-width:0;}
@@ -120,15 +199,21 @@ const css = `
   .ico:hover{border-color:#f8f4ff;color:#f8f4ff;}
   .ico.del:hover{border-color:#9e1e30;color:#9e1e30;}
   .add-panel{border-radius:18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:20px;display:flex;flex-direction:column;gap:14px;}
-  .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+  .ph{display:flex;align-items:center;justify-content:space-between;}
   .ph-t{font-family:'Playfair Display',serif;font-size:1rem;}
   .img-up{width:100%;aspect-ratio:1;border-radius:14px;border:1px dashed rgba(200,192,216,0.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;position:relative;overflow:hidden;background:rgba(0,0,0,0.3);}
   .img-up:hover{border-color:rgba(200,192,216,0.28);}
   .img-up img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .img-up-ov{position:absolute;inset:0;background:rgba(5,2,8,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0;transition:opacity 0.2s;}
   .img-up:hover .img-up-ov{opacity:1;}
-  .up-plus{font-size:2rem;color:rgba(200,192,216,0.2);}
-  .up-hint{font-size:0.58rem;letter-spacing:2px;color:#3a3550;text-transform:uppercase;}
+  .garment-guide{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;}
+  .garment-guide-title{font-size:0.55rem;letter-spacing:3px;color:#c8c0d8;text-transform:uppercase;margin-bottom:10px;opacity:0.6;}
+  .garment-guide-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .garment-guide-col{display:flex;flex-direction:column;gap:6px;}
+  .garment-guide-col-title{font-size:0.52rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+  .garment-guide-col.gd .garment-guide-col-title{color:#c8c0d8;}
+  .garment-guide-col.bd .garment-guide-col-title{color:#9e1e30;}
+  .garment-guide-item{font-size:0.6rem;color:#4a4560;display:flex;align-items:flex-start;gap:6px;line-height:1.5;}
   .fld-l{font-size:0.56rem;letter-spacing:3px;color:#3a3550;text-transform:uppercase;margin-bottom:6px;}
   .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   .cat-o{padding:10px 8px;border-radius:10px;background:transparent;border:1px solid #1a1628;color:#4a4560;font-family:'Raleway',sans-serif;font-size:0.62rem;cursor:pointer;transition:all 0.15s;text-align:left;}
@@ -145,11 +230,12 @@ const css = `
   .sticky{position:fixed;bottom:0;left:0;right:0;padding:16px 20px 30px;background:linear-gradient(to top,rgba(5,2,8,1) 55%,transparent);}
   .gen-btn{width:100%;max-width:520px;margin:0 auto;display:block;padding:20px;background:linear-gradient(135deg,#f0eaff,#c8c0d8);color:#050208;border:none;border-radius:100px;font-family:'Raleway',sans-serif;font-weight:700;font-size:0.78rem;letter-spacing:7px;text-transform:uppercase;cursor:pointer;transition:all 0.22s;position:relative;overflow:hidden;}
   .gen-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);transform:translateX(-100%);animation:shim 2.8s infinite;}
-  @keyframes shim{to{transform:translateX(100%);}}
   .gen-btn:hover{transform:translateY(-2px);box-shadow:0 14px 44px rgba(200,192,216,0.2);}
   .gen-btn:disabled{opacity:0.3;cursor:not-allowed;transform:none;}
   .gen-sub{text-align:center;font-size:0.52rem;letter-spacing:2px;color:#2e2a3a;text-transform:uppercase;margin-top:8px;max-width:520px;margin-left:auto;margin-right:auto;}
   .gen-sub em{color:#9e1e30;font-style:normal;}
+
+  /* RESULT */
   .res-frame{width:100%;aspect-ratio:3/5;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);position:relative;}
   .res-frame img{width:100%;height:100%;object-fit:cover;}
   .res-badge{position:absolute;top:16px;left:16px;background:rgba(5,2,8,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:7px 16px;font-size:0.52rem;letter-spacing:3px;color:#c8c0d8;text-transform:uppercase;}
@@ -162,26 +248,20 @@ const css = `
   .res-act:hover{background:rgba(255,255,255,0.07);color:#f8f4ff;}
   .back-btn{width:100%;padding:14px;background:transparent;border:1px solid #1e1a2a;border-radius:100px;color:#3a3550;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
   .back-btn:hover{border-color:#3a3550;color:#8a8098;}
-  .tip-row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:12px;border:1px solid transparent;}
-  .tip-row.good{background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.06);}
-  .tip-row.bad{background:rgba(122,21,37,0.05);border-color:rgba(122,21,37,0.12);}
-  .tip-ic{font-size:0.7rem;flex-shrink:0;}
-  .tip-row.good .tip-ic{color:#c8c0d8;}
-  .tip-row.bad .tip-ic{color:#9e1e30;opacity:0.8;}
-  .tip-tx{font-size:0.78rem;color:#8a8098;}
-  .tip-row.good .tip-tx{color:#b0a8c0;}
-  .ai-note{padding:16px 18px;border-radius:14px;background:rgba(122,21,37,0.06);border:1px solid rgba(158,30,48,0.15);font-size:0.72rem;color:#7a7090;line-height:1.8;}
-  .ai-note strong{color:#aaa0b8;}
+
+  /* FIND THIS FIT */
   .ftf-up{width:100%;aspect-ratio:4/5;border-radius:18px;border:1px dashed rgba(200,192,216,0.12);background:rgba(5,2,8,0.5);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;cursor:pointer;position:relative;overflow:hidden;}
   .ftf-up:hover{border-color:rgba(200,192,216,0.28);}
   .ftf-up img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .ftf-up-ov{position:absolute;inset:0;background:rgba(5,2,8,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;opacity:0;transition:opacity 0.2s;}
   .ftf-up:hover .ftf-up-ov{opacity:1;}
-  .ftf-res{padding:20px;border-radius:18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:12px;}
+  .ftf-res{padding:20px;border-radius:18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:12px;margin-bottom:10px;}
   .ftf-rt{font-family:'Playfair Display',serif;font-size:1rem;color:#c8c0d8;}
   .ftf-rd{font-size:0.74rem;color:#8a8098;line-height:1.85;}
   .ftf-tags{display:flex;flex-wrap:wrap;gap:8px;}
   .ftf-tag{padding:6px 14px;border-radius:100px;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;background:rgba(122,21,37,0.1);border:1px solid rgba(158,30,48,0.2);color:#9e1e30;}
+
+  /* REVIEWS */
   .rev-form{padding:22px;border-radius:18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:14px;}
   .star-row{display:flex;gap:8px;}
   .star-btn{font-size:1.5rem;background:transparent;border:none;cursor:pointer;transition:transform 0.15s;line-height:1;}
@@ -198,13 +278,14 @@ const css = `
   .rev-auth{font-size:0.54rem;letter-spacing:3px;text-transform:uppercase;color:#4a4560;}
   .rev-dt{font-size:0.5rem;color:#2a2535;margin-left:8px;}
   .no-rev{text-align:center;padding:32px 0;font-size:0.6rem;letter-spacing:2px;color:#1e1a2a;text-transform:uppercase;line-height:2.5;}
+
+  /* MODAL */
   .modal-bg{position:fixed;inset:0;background:rgba(5,2,8,0.95);backdrop-filter:blur(12px);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
   .modal-box{width:100%;max-width:460px;background:#080510;border:1px solid rgba(255,255,255,0.08);border-radius:24px 24px 0 0;padding:28px 22px 40px;max-height:92vh;overflow-y:auto;}
   .modal-handle{width:34px;height:3px;background:#1e1a2a;border-radius:100px;margin:0 auto 22px;}
   .modal-t{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:400;margin-bottom:6px;}
   .modal-t em{font-style:italic;color:#c8c0d8;}
   .modal-s{font-size:0.62rem;letter-spacing:1.5px;color:#3a3550;line-height:1.9;margin-bottom:20px;}
-  .modal-s a{color:#c8c0d8;}
   .tier{border-radius:16px;padding:18px 20px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;}
   .tier.feat{border-color:rgba(158,30,48,0.2);background:rgba(122,21,37,0.06);}
   .tier-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
@@ -218,9 +299,12 @@ const css = `
   .pack-btn{width:100%;padding:12px 18px;background:transparent;border:1px solid #1e1a2a;border-radius:12px;color:#4a4560;font-family:'Raleway',sans-serif;font-size:0.68rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
   .pack-btn:hover{border-color:#c8c0d8;color:#f8f4ff;}
   .div-txt{text-align:center;font-size:0.52rem;letter-spacing:2px;color:#1e1a2a;text-transform:uppercase;margin:6px 0;}
-  .m-inp{width:100%;background:#050208;border:1px solid #1e1a2a;border-radius:12px;color:#f8f4ff;font-family:'Raleway',sans-serif;font-size:0.75rem;padding:14px 16px;outline:none;margin-bottom:12px;}
-  .m-inp:focus{border-color:#c8c0d8;}
   .err-txt{font-size:0.62rem;color:#9e1e30;letter-spacing:1px;}
+
+  /* ACCOUNT */
+  .acct-avatar{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid rgba(200,192,216,0.3);margin:0 auto 16px;display:block;}
+  .acct-name{text-align:center;font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:4px;}
+  .acct-email{text-align:center;font-size:0.6rem;letter-spacing:2px;color:#3a3550;text-transform:uppercase;margin-bottom:20px;}
 `;
 
 function Stars({count}){
@@ -228,99 +312,203 @@ function Stars({count}){
 }
 
 function App(){
-  const [tab,setTab]=useState("home");
-  const [userPhoto,setUserPhoto]=useState(null);
-  const [outfitItems,setOutfitItems]=useState([]);
-  const [renderedLook,setRenderedLook]=useState(null);
-  const [isRendering,setIsRendering]=useState(false);
-  const [renderCount,setRenderCount]=useState(0);
-  const [paidLooks,setPaidLooks]=useState(0);
-  const [userPlan,setUserPlan]=useState("free");
-  const [showPaywall,setShowPaywall]=useState(false);
-  const [showPricing,setShowPricing]=useState(false);
-  const [apiKey,setApiKey]=useState("");
-  const [showApiModal,setShowApiModal]=useState(false);
-  const [renderStep,setRenderStep]=useState("");
-  const [addingItem,setAddingItem]=useState(false);
-  const [newItem,setNewItem]=useState({category:"top",placement:"Auto-detect",customPlacement:"",image:null,name:""});
-  const [editingId,setEditingId]=useState(null);
-  const [ftfPhoto,setFtfPhoto]=useState(null);
-  const [ftfResult,setFtfResult]=useState(null);
-  const [ftfLoading,setFtfLoading]=useState(false);
-  const [reviews,setReviews]=useState([]);
-  const [newRev,setNewRev]=useState({stars:0,text:"",name:""});
-  const [revErr,setRevErr]=useState("");
-  const [revSub,setRevSub]=useState(false);
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("home");
+  const [authMode, setAuthMode] = useState("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [authErr, setAuthErr] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [setupStep, setSetupStep] = useState(1);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarBase64, setAvatarBase64] = useState(null);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const [outfitItems, setOutfitItems] = useState([]);
+  const [renderedLook, setRenderedLook] = useState(null);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderCount, setRenderCount] = useState(0);
+  const [paidLooks, setPaidLooks] = useState(0);
+  const [userPlan, setUserPlan] = useState("free");
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [renderStep, setRenderStep] = useState("");
+  const [addingItem, setAddingItem] = useState(false);
+  const [newItem, setNewItem] = useState({category:"top",placement:"Auto-detect",customPlacement:"",image:null,name:""});
+  const [editingId, setEditingId] = useState(null);
+  const [ftfPhoto, setFtfPhoto] = useState(null);
+  const [ftfResult, setFtfResult] = useState(null);
+  const [ftfLoading, setFtfLoading] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [newRev, setNewRev] = useState({stars:0,text:"",name:""});
+  const [revErr, setRevErr] = useState("");
+  const [revSub, setRevSub] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
-  const photoRef=useRef(null);
-  const itemRef=useRef(null);
-  const ftfRef=useRef(null);
+  const avatarRef = useRef(null);
+  const itemRef = useRef(null);
+  const ftfRef = useRef(null);
 
+  // Auth state
+  useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>{
+      setUser(session?.user ?? null);
+      if(session?.user) loadProfile(session.user);
+      else setLoading(false);
+    });
+    const {data:{subscription}} = supabase.auth.onAuthStateChange((_,session)=>{
+      setUser(session?.user ?? null);
+      if(session?.user) loadProfile(session.user);
+      else { setProfile(null); setLoading(false); }
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
+
+  const loadProfile = async(u)=>{
+    const {data} = await supabase.from('profiles').select('*').eq('id',u.id).single();
+    setProfile(data);
+    setLoading(false);
+  };
+
+  // Load reviews
   useEffect(()=>{
     (async()=>{try{const r=await window.storage?.get("fitted_reviews",true);if(r?.value)setReviews(JSON.parse(r.value));}catch(_){}})();
   },[]);
 
-  const totalLooks=FREE_LIMIT+paidLooks;
-  const looksLeft=userPlan==="unlimited"?Infinity:Math.max(0,totalLooks-renderCount);
-  const canRender=userPlan==="unlimited"||looksLeft>0;
+  const totalLooks = FREE_LIMIT + paidLooks;
+  const looksLeft = userPlan==="unlimited" ? Infinity : Math.max(0, totalLooks - renderCount);
+  const canRender = userPlan==="unlimited" || looksLeft>0;
 
-  const onPhoto=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setUserPhoto(ev.target.result);setTab("try");};r.readAsDataURL(f);};
-  const onItem=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setNewItem(p=>({...p,image:ev.target.result,name:f.name.replace(/\.[^/.]+$/,"")}));r.readAsDataURL(f);};
-  const onFtf=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setFtfPhoto(ev.target.result);setFtfResult(null);};r.readAsDataURL(f);};
+  // Auth
+  const handleAuth = async()=>{
+    setAuthErr(""); setAuthLoading(true);
+    try{
+      if(authMode==="login"){
+        const {error} = await supabase.auth.signInWithPassword({email:authEmail,password:authPass});
+        if(error) setAuthErr(error.message);
+      } else {
+        const {data,error} = await supabase.auth.signUp({email:authEmail,password:authPass});
+        if(error) setAuthErr(error.message);
+        else if(data.user){
+          await supabase.from('profiles').insert({id:data.user.id,email:authEmail});
+        }
+      }
+    }catch(e){ setAuthErr("Something went wrong. Try again."); }
+    setAuthLoading(false);
+  };
+
+  const handleSignOut = async()=>{ await supabase.auth.signOut(); setShowAccount(false); setTab("home"); };
+
+  // Avatar
+  const onAvatarImg = (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      // Compress
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        const max=800;
+        let w=img.width, h=img.height;
+        if(w>max){h=h*(max/w);w=max;}
+        if(h>max){w=w*(max/h);h=max;}
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const compressed=canvas.toDataURL('image/jpeg',0.7);
+        setAvatarPreview(compressed);
+        setAvatarBase64(compressed);
+      };
+      img.src=ev.target.result;
+    };
+    rd.readAsDataURL(f);
+  };
+
+  const saveAvatar = async()=>{
+    if(!avatarBase64||!user) return;
+    setSavingAvatar(true);
+    await supabase.from('profiles').upsert({id:user.id,email:user.email,avatar_base64:avatarBase64});
+    await loadProfile(user);
+    setSavingAvatar(false);
+  };
+
+  // Outfit items
+  const onItemImg = (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        const max=600; let w=img.width,h=img.height;
+        if(w>max){h=h*(max/w);w=max;}
+        if(h>max){w=w*(max/h);h=max;}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const compressed=canvas.toDataURL('image/jpeg',0.7);
+        setNewItem(p=>({...p,image:compressed,name:f.name.replace(/\.[^/.]+$/,"")}));
+      };
+      img.src=ev.target.result;
+    };
+    rd.readAsDataURL(f);
+  };
+
+  const onFtf = (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=ev=>{setFtfPhoto(ev.target.result);setFtfResult(null);};
+    rd.readAsDataURL(f);
+  };
 
   const saveItem=()=>{
-    if(!newItem.image)return;
+    if(!newItem.image) return;
     const placement=newItem.customPlacement||newItem.placement;
     const item={...newItem,placement,id:editingId||Date.now()};
     if(editingId){setOutfitItems(p=>p.map(i=>i.id===editingId?item:i));setEditingId(null);}
     else setOutfitItems(p=>[...p,item]);
     setNewItem({category:"top",placement:"Auto-detect",customPlacement:"",image:null,name:""});
-    setAddingItem(false);setRenderedLook(null);
+    setAddingItem(false); setRenderedLook(null);
   };
   const editItem=item=>{setNewItem({...item});setEditingId(item.id);setAddingItem(true);};
   const removeItem=id=>{setOutfitItems(p=>p.filter(i=>i.id!==id));setRenderedLook(null);};
 
   const handleGetFitted=()=>{
+    if(!profile?.avatar_base64){alert("Please set up your avatar photo first!");setTab("try");return;}
     if(!canRender){setShowPaywall(true);return;}
-    if(!apiKey){setShowApiModal(true);return;}
     generateLook();
   };
 
   const generateLook=async()=>{
-    if(!userPhoto||outfitItems.length===0)return;
-    setIsRendering(true);setRenderedLook(null);setTab("result");
+    if(!profile?.avatar_base64||outfitItems.length===0) return;
+    setIsRendering(true); setRenderedLook(null); setTab("result");
     try{
-      let cur=userPhoto;
+      let cur=profile.avatar_base64;
       const catMap={top:"upper_body",bottom:"lower_body",dress:"upper_body",outerwear:"upper_body",shoes:"lower_body",accessory:"auto",headwear:"auto",swimwear:"upper_body"};
       for(let i=0;i<outfitItems.length;i++){
         const item=outfitItems[i];
         setRenderStep(`Fitting ${item.name||item.category}... (${i+1} of ${outfitItems.length})`);
-        const res=await fetch("/api/tryon",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({apiKey,modelImage:cur,garmentImage:item.image,category:catMap[item.category]||"auto"}),
+        const res=await fetch('/api/tryon',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({modelImage:cur,garmentImage:item.image,category:catMap[item.category]||"auto"}),
         });
-        if(!res.ok)throw new Error(`Server error ${res.status}`);
+        if(!res.ok) throw new Error(`Server error ${res.status}`);
         const data=await res.json();
-        if(data.error)throw new Error(data.error);
+        if(data.error) throw new Error(data.error);
         cur=data.result;
       }
-      setRenderedLook(cur);setRenderCount(c=>c+1);setRenderStep("");
+      setRenderedLook(cur); setRenderCount(c=>c+1); setRenderStep("");
     }catch(err){
-      alert("Render failed: "+err.message);setRenderStep("");setTab("try");
+      alert("Render failed: "+err.message); setRenderStep(""); setTab("try");
     }
     setIsRendering(false);
   };
 
   const findThisFit=async()=>{
-    if(!ftfPhoto)return;
-    setFtfLoading(true);setFtfResult(null);
+    if(!ftfPhoto) return;
+    setFtfLoading(true); setFtfResult(null);
     try{
-      const res=await fetch("/api/findfit",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({image:ftfPhoto}),
-      });
+      const res=await fetch('/api/findfit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:ftfPhoto})});
       const data=await res.json();
       setFtfResult(data);
     }catch(e){setFtfResult({error:true});}
@@ -331,274 +519,417 @@ function App(){
     if(!newRev.stars){setRevErr("Please select a star rating");return;}
     if(!newRev.text.trim()){setRevErr("Please write a review");return;}
     if(!newRev.name.trim()){setRevErr("Please enter your name");return;}
-    setRevSub(true);setRevErr("");
+    setRevSub(true); setRevErr("");
     const rev={...newRev,id:Date.now(),date:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})};
     const updated=[rev,...reviews];
     try{await window.storage?.set("fitted_reviews",JSON.stringify(updated),true);setReviews(updated);setNewRev({stars:0,text:"",name:""});}
-    catch(e){setRevErr("Failed to save. Try again.");}
+    catch(e){setRevErr("Failed to save.");}
     setRevSub(false);
   };
 
   const buy=looks=>{setPaidLooks(p=>p+looks);setShowPaywall(false);setShowPricing(false);};
   const subscribe=()=>{setUserPlan("unlimited");setShowPaywall(false);setShowPricing(false);};
 
-  return(
-    <div className="app">
+  if(loading) return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#050208"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",background:"linear-gradient(135deg,#f0eaff,#b0a8c0)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"6px",marginBottom:"20px"}}>FITTed</div>
+        <div className="spin" style={{margin:"0 auto"}}/>
+      </div>
+    </div>
+  );
+
+  // NOT LOGGED IN
+  if(!user) return(
+    <>
       <style>{css}</style>
-
-      <header className="hdr">
-        <div className="logo" onClick={()=>setTab("home")}>
-          <span className="logo-m">FITT</span><span className="logo-a">ed</span>
-        </div>
-        <div className="chip" onClick={()=>setShowPricing(true)}>
-          {userPlan==="unlimited"?<><em>∞</em> unlimited</>:<><em>{looksLeft}</em> looks left</>}
-        </div>
-      </header>
-
-      <nav className="tabs">
-        {[{id:"home",l:"Home"},{id:"guide",l:"Photo Guide"},{id:"try",l:"Try On"},{id:"find",l:"Find This Fit"},{id:"reviews",l:"Reviews"}].map(t=>(
-          <button key={t.id} className={`tab ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>
-        ))}
-      </nav>
-
-      {/* HOME */}
-      {tab==="home"&&(
-        <div className="wrap">
-          <div className="hero">
-            <div className="hero-t">See it on<br/><em>you.</em></div>
-            <div className="hero-s">Any outfit · Any site · Your body</div>
-            <div className="btn-w">
-              <button className="btn-p" onClick={()=>photoRef.current?.click()}>Get Fitted ✦</button>
-              <button className="btn-g" onClick={()=>setTab("find")}>Find This Fit 🔍</button>
-              <button className="btn-g" onClick={()=>setShowPricing(true)}>View Pricing</button>
+      <div className="app">
+        <header className="hdr">
+          <div className="logo"><span className="logo-m">FITT</span><span className="logo-a">ed</span></div>
+        </header>
+        <div className="auth-wrap">
+          <div className="auth-box">
+            <div className="auth-t">{authMode==="login"?"Welcome <em>back.</em>":"Join <em>FITTED.</em>"}</div>
+            <div className="auth-s">{authMode==="login"?"Sign in to access your saved avatar and looks.":"Create your account and set up your avatar."}</div>
+            <input className="auth-inp" type="email" placeholder="Email address" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/>
+            <input className="auth-inp" type="password" placeholder="Password" value={authPass} onChange={e=>setAuthPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/>
+            {authErr&&<div className="auth-err">{authErr}</div>}
+            <button className="btn-p" onClick={handleAuth} disabled={authLoading}>
+              {authLoading?"...":(authMode==="login"?"Sign In ✦":"Create Account ✦")}
+            </button>
+            <div className="auth-switch">
+              {authMode==="login"?"Don't have an account? ":"Already have an account? "}
+              <button onClick={()=>{setAuthMode(authMode==="login"?"signup":"login");setAuthErr("");}}>
+                {authMode==="login"?"Sign up":"Sign in"}
+              </button>
             </div>
-            <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={onPhoto}/>
           </div>
-          <div className="chrome-line"/>
-          <div className="p-row">
-            <div className="gc p-card" onClick={()=>setTab("guide")}><div><div className="p-nm">Free</div><div className="p-ds">3 looks, no card needed</div></div><div className="p-pr">£0</div></div>
-            <div className="gc p-card" onClick={()=>setShowPricing(true)}><div><div className="p-nm">Pay Per Look</div><div className="p-ds">Buy looks as you need them</div></div><div className="p-pr">£1.49<small>/look</small></div></div>
-            <div className="gc p-card feat" onClick={()=>setShowPricing(true)}><div><div className="p-nm">Unlimited<span className="badge">Best</span></div><div className="p-ds">Unlimited renders + priority</div></div><div className="p-pr">£9.99<small>/mo</small></div></div>
+        </div>
+      </div>
+    </>
+  );
+
+  // AVATAR SETUP — no avatar yet
+  if(!profile?.avatar_base64) return(
+    <>
+      <style>{css}</style>
+      <div className="app">
+        <header className="hdr">
+          <div className="logo"><span className="logo-m">FITT</span><span className="logo-a">ed</span></div>
+          <button className="btn-g" style={{width:"auto",padding:"8px 16px",fontSize:"0.58rem"}} onClick={handleSignOut}>Sign Out</button>
+        </header>
+
+        <div className="setup-wrap">
+          {setupStep===1&&(<>
+            <div>
+              <div className="setup-step">Step 1 of 2</div>
+              <div className="sec-t" style={{marginTop:6}}>Your <em>Avatar</em></div>
+              <div style={{fontSize:"0.7rem",color:"#5a5070",lineHeight:1.8,marginTop:8}}>
+                Upload your photo once and it's saved forever. Every try-on uses this photo automatically — you never need to upload yourself again.
+              </div>
+            </div>
+
+            <div style={{fontSize:"0.6rem",letterSpacing:"3px",color:"rgba(200,192,216,0.4)",textTransform:"uppercase"}}>✦ Photo Guidelines</div>
+
+            <div className="guide-grid">
+              <div className="guide-card good">
+                <div className="guide-head">✦ Do this</div>
+                {PHOTO_GOOD.map((t,i)=><div key={i} className="guide-item"><span className="guide-ic">✦</span><span>{t}</span></div>)}
+              </div>
+              <div className="guide-card bad">
+                <div className="guide-head">✕ Avoid this</div>
+                {PHOTO_BAD.map((t,i)=><div key={i} className="guide-item"><span className="guide-ic">✕</span><span>{t}</span></div>)}
+              </div>
+            </div>
+
+            <div className="example-row">
+              <div className="example-box good-ex">
+                <div className="ex-icon">🧍</div>
+                <div className="ex-label">✦ Perfect</div>
+                <div className="ex-tips">Full body, fitted top & leggings, plain wall</div>
+              </div>
+              <div className="example-box bad-ex">
+                <div className="ex-icon">🧥</div>
+                <div className="ex-label">✕ Avoid</div>
+                <div className="ex-tips">Baggy clothes, busy background, cropped</div>
+              </div>
+            </div>
+
+            <div style={{background:"rgba(122,21,37,0.06)",border:"1px solid rgba(158,30,48,0.15)",borderRadius:14,padding:"16px 18px",fontSize:"0.72rem",color:"#7a7090",lineHeight:1.8}}>
+              <strong style={{color:"#aaa0b8"}}>No nudity needed.</strong> Wear a fitted outfit — leggings and a crop top, a bodycon dress, anything that shows your shape. The AI removes what you're wearing and replaces it.
+            </div>
+
+            <button className="btn-p" onClick={()=>setSetupStep(2)}>Continue ✦</button>
+          </>)}
+
+          {setupStep===2&&(<>
+            <div>
+              <div className="setup-step">Step 2 of 2</div>
+              <div className="sec-t" style={{marginTop:6}}>Upload Your <em>Photo</em></div>
+              <div style={{fontSize:"0.7rem",color:"#5a5070",lineHeight:1.8,marginTop:8}}>
+                This becomes your permanent avatar. Full body, fitted clothes, plain background.
+              </div>
+            </div>
+
+            <div className="avatar-upload" onClick={()=>avatarRef.current?.click()}>
+              {avatarPreview&&<img src={avatarPreview} alt="Your avatar"/>}
+              <div className="avatar-upload-ov">
+                <div className="up-plus">＋</div>
+                <div className="up-hint">Change Photo</div>
+              </div>
+              {!avatarPreview&&(<>
+                <div className="up-plus">＋</div>
+                <div className="up-hint">Tap to upload your photo</div>
+                <div style={{fontSize:"0.56rem",color:"#2e2a3a",letterSpacing:"1px",textAlign:"center",padding:"0 20px"}}>Full body · Fitted outfit · Plain background</div>
+              </>)}
+            </div>
+            <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={onAvatarImg}/>
+
+            {avatarPreview&&(
+              <button className="btn-p" onClick={saveAvatar} disabled={savingAvatar}>
+                {savingAvatar?"Saving...":"Save My Avatar ✦"}
+              </button>
+            )}
+            <button className="btn-g" onClick={()=>setSetupStep(1)}>← Back to Guidelines</button>
+          </>)}
+        </div>
+      </div>
+    </>
+  );
+
+  // MAIN APP
+  return(
+    <>
+      <style>{css}</style>
+      <div className="app">
+        <header className="hdr">
+          <div className="logo" onClick={()=>setTab("home")}><span className="logo-m">FITT</span><span className="logo-a">ed</span></div>
+          <div className="hdr-r">
+            <div className="chip" onClick={()=>setShowPricing(true)}>
+              {userPlan==="unlimited"?<><em>∞</em> unlimited</>:<><em>{looksLeft}</em> looks</>}
+            </div>
+            {profile?.avatar_base64&&(
+              <img src={profile.avatar_base64} className="avatar-chip" onClick={()=>setShowAccount(true)} alt="You"/>
+            )}
           </div>
-          {reviews.length>0&&(<>
+        </header>
+
+        <nav className="tabs">
+          {[{id:"home",l:"Home"},{id:"try",l:"Try On"},{id:"find",l:"Find This Fit"},{id:"reviews",l:"Reviews"}].map(t=>(
+            <button key={t.id} className={`tab ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>
+          ))}
+        </nav>
+
+        {/* HOME */}
+        {tab==="home"&&(
+          <div className="wrap">
+            <div className="hero">
+              <div className="hero-t">See it on<br/><em>you.</em></div>
+              <div className="hero-s">Any outfit · Any site · Your body</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10,width:"100%"}}>
+                <button className="btn-p" onClick={()=>setTab("try")}>Get Fitted ✦</button>
+                <button className="btn-g" onClick={()=>setTab("find")}>Find This Fit 🔍</button>
+                <button className="btn-g" onClick={()=>setShowPricing(true)}>View Pricing</button>
+              </div>
+            </div>
             <div className="chrome-line"/>
-            <div><div className="eyebrow">✦ Community</div><div className="sec-t">What people <em>say</em></div></div>
-            {reviews.slice(0,3).map(r=>(
+            <div className="p-row">
+              <div className="p-card" onClick={()=>setTab("try")}><div><div className="p-nm">Free</div><div className="p-ds">3 looks, no card needed</div></div><div className="p-pr">£0</div></div>
+              <div className="p-card" onClick={()=>setShowPricing(true)}><div><div className="p-nm">Pay Per Look</div><div className="p-ds">Buy looks as you need them</div></div><div className="p-pr">£1.49<small>/look</small></div></div>
+              <div className="p-card feat" onClick={()=>setShowPricing(true)}><div><div className="p-nm">Unlimited<span className="badge">Best</span></div><div className="p-ds">Unlimited renders + priority</div></div><div className="p-pr">£9.99<small>/mo</small></div></div>
+            </div>
+            {reviews.length>0&&(<>
+              <div className="chrome-line"/>
+              <div><div className="eyebrow">✦ Community</div><div className="sec-t">What people <em>say</em></div></div>
+              {reviews.slice(0,3).map(r=>(
+                <div key={r.id} className="rev-card"><Stars count={r.stars}/><div className="rev-txt">"{r.text}"</div><span className="rev-auth">{r.name}</span><span className="rev-dt">{r.date}</span></div>
+              ))}
+              {reviews.length>3&&<button className="btn-g" onClick={()=>setTab("reviews")}>See all {reviews.length} reviews →</button>}
+            </>)}
+          </div>
+        )}
+
+        {/* TRY ON */}
+        {tab==="try"&&(
+          <>
+            <div className="wrap">
+              {/* Avatar preview */}
+              {profile?.avatar_base64?(
+                <div className="photo-frame">
+                  <img src={profile.avatar_base64} alt="Your avatar"/>
+                  <button className="chg-btn" onClick={()=>{setProfile(p=>({...p,avatar_base64:null}));}}>Change Avatar</button>
+                </div>
+              ):(
+                <div className="no-avatar-box">
+                  <div style={{fontSize:"2rem",opacity:0.2}}>👤</div>
+                  <div style={{fontSize:"0.65rem",letterSpacing:"2px",color:"#3a3550",textTransform:"uppercase",lineHeight:2}}>No avatar set<br/>Set up your photo to start</div>
+                  <button className="btn-c" style={{maxWidth:240}} onClick={()=>setProfile(p=>({...p,avatar_base64:null}))}>Set Up Avatar ✦</button>
+                </div>
+              )}
+
+              <div className="chrome-line"/>
+              <div style={{fontSize:"0.54rem",letterSpacing:"4px",color:"#2e2a3a",textTransform:"uppercase"}}>✦ Your Outfit — {outfitItems.length} {outfitItems.length===1?"piece":"pieces"}</div>
+
+              {outfitItems.length===0&&!addingItem&&<div className="empty">No items yet<br/>Add your first piece below</div>}
+
+              <div>{outfitItems.map(item=>(
+                <div key={item.id} className="oi">
+                  <img src={item.image} alt={item.name}/>
+                  <div className="oi-info">
+                    <div className="oi-cat">{CATEGORY_OPTIONS.find(c=>c.id===item.category)?.label}</div>
+                    <div className="oi-nm">{item.name||"Item"}</div>
+                    <div className="oi-pl">↳ {item.placement}</div>
+                  </div>
+                  <div className="oi-acts">
+                    <button className="ico" onClick={()=>editItem(item)}>✎</button>
+                    <button className="ico del" onClick={()=>removeItem(item.id)}>✕</button>
+                  </div>
+                </div>
+              ))}</div>
+
+              {addingItem?(
+                <div className="add-panel">
+                  <div className="ph">
+                    <div className="ph-t">{editingId?"Edit Item":"Add Item"}</div>
+                    <button className="ico" onClick={()=>{setAddingItem(false);setEditingId(null);setNewItem({category:"top",placement:"Auto-detect",customPlacement:"",image:null,name:""});}}>✕</button>
+                  </div>
+
+                  {/* Garment guidelines */}
+                  <div className="garment-guide">
+                    <div className="garment-guide-title">✦ Clothing Image Guidelines</div>
+                    <div className="garment-guide-row">
+                      <div className="garment-guide-col gd">
+                        <div className="garment-guide-col-title">✦ Good</div>
+                        {GARMENT_GOOD.map((t,i)=><div key={i} className="garment-guide-item"><span style={{color:"#c8c0d8",flexShrink:0}}>✦</span><span>{t}</span></div>)}
+                      </div>
+                      <div className="garment-guide-col bd">
+                        <div className="garment-guide-col-title">✕ Avoid</div>
+                        {GARMENT_BAD.map((t,i)=><div key={i} className="garment-guide-item"><span style={{color:"#9e1e30",flexShrink:0,opacity:0.7}}>✕</span><span>{t}</span></div>)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="img-up" onClick={()=>itemRef.current?.click()}>
+                    {newItem.image&&<img src={newItem.image} alt="item"/>}
+                    <div className="img-up-ov"><div className="up-plus">＋</div><div className="up-hint">Change</div></div>
+                    {!newItem.image&&(<><div className="up-plus">＋</div><div className="up-hint">Upload Clothing Image</div><div style={{fontSize:"0.55rem",color:"#2e2a3a"}}>Screenshot from any site</div></>)}
+                  </div>
+                  <input ref={itemRef} type="file" accept="image/*" style={{display:"none"}} onChange={onItemImg}/>
+
+                  <div>
+                    <div className="fld-l">What type of item?</div>
+                    <div className="cat-grid">{CATEGORY_OPTIONS.map(c=>(
+                      <button key={c.id} className={`cat-o ${newItem.category===c.id?"sel":""}`} onClick={()=>setNewItem(p=>({...p,category:c.id}))}>{c.icon} {c.label}</button>
+                    ))}</div>
+                  </div>
+
+                  <div>
+                    <div className="fld-l">Where does it go?</div>
+                    <select className="s-sel" value={newItem.placement} onChange={e=>setNewItem(p=>({...p,placement:e.target.value}))}>
+                      {PLACEMENT_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <input className="s-inp" placeholder='Or type exactly — e.g. "left wrist" or "right ear"' value={newItem.customPlacement} onChange={e=>setNewItem(p=>({...p,customPlacement:e.target.value}))}/>
+                  </div>
+
+                  <button className="btn-p" onClick={saveItem} disabled={!newItem.image}>{editingId?"Update Item":"Add to Outfit"} ✦</button>
+                </div>
+              ):(
+                <button className="add-more" onClick={()=>setAddingItem(true)}>＋ {outfitItems.length>0?"Add Another Piece":"Add First Piece"}</button>
+              )}
+            </div>
+
+            {!addingItem&&outfitItems.length>0&&(
+              <div className="sticky">
+                <button className="gen-btn" onClick={handleGetFitted} disabled={isRendering}>Get Fitted ✦</button>
+                <div className="gen-sub">{outfitItems.length} piece{outfitItems.length>1?"s":""} · {userPlan==="unlimited"?"∞ unlimited":<><em>{looksLeft}</em> render{looksLeft===1?"":"s"} left</>}</div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* RESULT */}
+        {tab==="result"&&(
+          <div className="wrap">
+            <div className="res-frame">
+              {isRendering&&<div className="rend-ov"><div className="spin"/><div className="rend-txt">{renderStep||"Getting you fitted..."}</div></div>}
+              {(renderedLook||profile?.avatar_base64)&&<img src={renderedLook||profile.avatar_base64} alt="Your look"/>}
+              {renderedLook&&<div className="res-badge">✦ Fitted</div>}
+            </div>
+            {renderedLook&&(<>
+              <div className="res-acts">
+                <button className="res-act" onClick={()=>{const a=document.createElement('a');a.href=renderedLook;a.download='fitted-look.jpg';a.click();}}>↓ Save</button>
+                <button className="res-act">⤴ Share</button>
+                <button className="res-act" onClick={()=>{setRenderedLook(null);setOutfitItems([]);setTab("try");}}>↺ Reset</button>
+              </div>
+              <button className="back-btn" onClick={()=>setTab("try")}>← Edit Outfit</button>
+              <button className="btn-g" onClick={()=>setTab("reviews")}>Leave a Review ✦</button>
+            </>)}
+          </div>
+        )}
+
+        {/* FIND THIS FIT */}
+        {tab==="find"&&(
+          <div className="wrap">
+            <div><div className="eyebrow">✦ AI Outfit Detective</div><div className="sec-t">Find <em>This Fit</em></div></div>
+            <div style={{fontSize:"0.72rem",color:"#5a5070",lineHeight:1.85}}>Seen an influencer wearing something fire but they won't say where it's from? Upload the photo — AI will identify every item and tell you where to find it.</div>
+            <div className="ftf-up" onClick={()=>ftfRef.current?.click()}>
+              {ftfPhoto&&<img src={ftfPhoto} alt="Upload"/>}
+              <div className="ftf-up-ov"><div className="up-plus">＋</div><div className="up-hint">Change Photo</div></div>
+              {!ftfPhoto&&(<><div style={{fontSize:"3rem",opacity:0.12}}>🔍</div><div className="up-hint">Upload Influencer Photo</div><div style={{fontSize:"0.56rem",color:"#2e2a3a"}}>Screenshot, saved photo, anything</div></>)}
+            </div>
+            <input ref={ftfRef} type="file" accept="image/*" style={{display:"none"}} onChange={onFtf}/>
+            {ftfPhoto&&!ftfResult&&<button className="btn-c" onClick={findThisFit} disabled={ftfLoading}>{ftfLoading?"Analysing...":"Find This Fit ✦"}</button>}
+            {ftfLoading&&<div style={{textAlign:"center",padding:"20px 0"}}><div className="spin" style={{margin:"0 auto 16px"}}/><div style={{fontSize:"0.56rem",letterSpacing:"3px",color:"#3a3550",textTransform:"uppercase"}}>Analysing the outfit...</div></div>}
+            {ftfResult&&!ftfResult.error&&(
+              <div>
+                {ftfResult.summary&&<div style={{fontSize:"0.78rem",color:"#8a8098",fontStyle:"italic",lineHeight:1.7,marginBottom:12}}>"{ftfResult.summary}"</div>}
+                {ftfResult.items?.map((item,i)=>(
+                  <div key={i} className="ftf-res">
+                    <div className="ftf-rt">{item.type}</div>
+                    <div className="ftf-rd">{item.description}</div>
+                    <div className="fld-l" style={{marginBottom:8}}>Could be from:</div>
+                    <div className="ftf-tags">{item.brands?.map((b,j)=><span key={j} className="ftf-tag">{b}</span>)}</div>
+                    {item.searchTerms?.length>0&&(<><div className="fld-l" style={{marginTop:12,marginBottom:4}}>Search terms:</div><div style={{fontSize:"0.7rem",color:"#5a5070",lineHeight:2}}>{item.searchTerms.join(" · ")}</div></>)}
+                  </div>
+                ))}
+                <button className="btn-g" onClick={()=>{setFtfPhoto(null);setFtfResult(null);}}>Try Another Photo</button>
+              </div>
+            )}
+            {ftfResult?.error&&<div style={{textAlign:"center",fontSize:"0.7rem",color:"#5a5070"}}>Something went wrong. Please try again.</div>}
+          </div>
+        )}
+
+        {/* REVIEWS */}
+        {tab==="reviews"&&(
+          <div className="wrap">
+            <div><div className="eyebrow">✦ Community</div><div className="sec-t">Real <em>Reviews</em></div></div>
+            <div className="rev-form">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1rem"}}>Leave Your Review</div>
+              <div><div className="fld-l">Your Rating</div>
+                <div className="star-row">{[1,2,3,4,5].map(i=><button key={i} className="star-btn" onClick={()=>setNewRev(p=>({...p,stars:i}))}><span style={{color:i<=newRev.stars?"#c9a84c":"#1e1a2a",fontSize:"1.6rem"}}>★</span></button>)}</div>
+              </div>
+              <div><div className="fld-l">Your Review</div><textarea className="rev-ta" rows={4} placeholder="Tell others about your experience..." value={newRev.text} onChange={e=>setNewRev(p=>({...p,text:e.target.value}))}/></div>
+              <input className="s-inp" style={{marginTop:0}} placeholder="Your name" value={newRev.name} onChange={e=>setNewRev(p=>({...p,name:e.target.value}))}/>
+              {revErr&&<div className="err-txt">{revErr}</div>}
+              <button className="btn-p" onClick={submitReview} disabled={revSub}>{revSub?"Submitting...":"Submit Review ✦"}</button>
+            </div>
+            <div className="chrome-line"/>
+            {reviews.length===0?<div className="no-rev">No reviews yet<br/>Be the first</div>:reviews.map(r=>(
               <div key={r.id} className="rev-card"><Stars count={r.stars}/><div className="rev-txt">"{r.text}"</div><span className="rev-auth">{r.name}</span><span className="rev-dt">{r.date}</span></div>
             ))}
-            {reviews.length>3&&<button className="btn-g" onClick={()=>setTab("reviews")}>See all {reviews.length} reviews →</button>}
-          </>)}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* GUIDE */}
-      {tab==="guide"&&(
-        <div className="wrap">
-          <div><div className="eyebrow">✦ Before You Start</div><div className="sec-t">Photo <em>Guide</em></div></div>
-          <div className="ai-note"><strong>No nudity needed.</strong> Upload a photo in fitted clothes — leggings, a fitted tee, anything showing your shape. The AI removes what you're wearing and replaces it with your new look.</div>
-          {PHOTO_TIPS.map((t,i)=>(
-            <div key={i} className={`tip-row ${t.good?"good":"bad"}`}>
-              <span className="tip-ic">{t.good?"✦":"✕"}</span>
-              <span className="tip-tx">{t.text}</span>
-            </div>
-          ))}
-          <button className="btn-p" onClick={()=>photoRef.current?.click()}>Upload My Photo ✦</button>
-          <button className="btn-g" onClick={()=>setTab("home")}>← Back</button>
-          <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={onPhoto}/>
-        </div>
-      )}
-
-      {/* TRY ON */}
-      {tab==="try"&&(
-        <>
-          <div className="wrap">
-            {userPhoto?(
-              <div className="photo-frame">
-                <img src={userPhoto} alt="You"/>
-                <button className="chg-btn" onClick={()=>photoRef.current?.click()}>Change Photo</button>
-                <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={onPhoto}/>
+        {/* PRICING MODAL */}
+        {showPricing&&(
+          <div className="modal-bg" onClick={()=>setShowPricing(false)}>
+            <div className="modal-box" onClick={e=>e.stopPropagation()}>
+              <div className="modal-handle"/>
+              <div className="modal-t">Choose Your <em>Plan</em></div>
+              <div className="modal-s">Try free. Pay when you're obsessed.</div>
+              <div className="tier"><div className="tier-h"><div className="tier-n">Free</div><div className="tier-p">£0</div></div><div className="tier-d">3 looks, no card needed.</div></div>
+              <div className="tier"><div className="tier-h"><div className="tier-n">Pay Per Look</div><div className="tier-p">£1.49<small>/look</small></div></div><div className="tier-d">For occasional shoppers.</div>
+                {PACKS.map(p=><button key={p.id} className="pack-btn" onClick={()=>buy(p.looks)}><span>{p.label}</span><span style={{color:"#c8c0d8"}}>£{p.price}</span></button>)}
               </div>
-            ):(
-              <div style={{textAlign:"center",padding:"40px 0",display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
-                <div style={{fontSize:"0.62rem",letterSpacing:"3px",color:"#2e2a3a",textTransform:"uppercase"}}>No photo yet</div>
-                <button className="btn-p" style={{maxWidth:280}} onClick={()=>photoRef.current?.click()}>Upload Your Photo</button>
-                <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={onPhoto}/>
+              <div className="tier feat"><div className="tier-h"><div className="tier-n">Unlimited<span className="badge">Best</span></div><div className="tier-p">£9.99<small>/mo</small></div></div><div className="tier-d">For the fashion obsessed.</div>
+                <ul className="tier-perks"><li>Unlimited AI renders</li><li>Priority speed</li><li>Save & share looks</li><li>Find This Fit unlimited</li><li>Early access</li></ul>
+                <button className="btn-c" style={{marginTop:14}} onClick={subscribe}>Subscribe ✦</button>
               </div>
-            )}
-            <div className="chrome-line"/>
-            <div style={{fontSize:"0.54rem",letterSpacing:"4px",color:"#2e2a3a",textTransform:"uppercase"}}>✦ Your Outfit — {outfitItems.length} {outfitItems.length===1?"piece":"pieces"}</div>
-            {outfitItems.length===0&&!addingItem&&<div className="empty">No items yet<br/>Add your first piece below</div>}
-            <div>{outfitItems.map(item=>(
-              <div key={item.id} className="oi">
-                <img src={item.image} alt={item.name}/>
-                <div className="oi-info">
-                  <div className="oi-cat">{CATEGORY_OPTIONS.find(c=>c.id===item.category)?.label}</div>
-                  <div className="oi-nm">{item.name||"Item"}</div>
-                  <div className="oi-pl">↳ {item.placement}</div>
-                </div>
-                <div className="oi-acts">
-                  <button className="ico" onClick={()=>editItem(item)}>✎</button>
-                  <button className="ico del" onClick={()=>removeItem(item.id)}>✕</button>
-                </div>
-              </div>
-            ))}</div>
-            {addingItem?(
-              <div className="add-panel">
-                <div className="ph"><div className="ph-t">{editingId?"Edit Item":"Add Item"}</div><button className="ico" onClick={()=>{setAddingItem(false);setEditingId(null);setNewItem({category:"top",placement:"Auto-detect",customPlacement:"",image:null,name:""});}}>✕</button></div>
-                <div className="img-up" onClick={()=>itemRef.current?.click()}>
-                  {newItem.image&&<img src={newItem.image} alt="item"/>}
-                  <div className="img-up-ov"><div className="up-plus">＋</div><div className="up-hint">Change</div></div>
-                  {!newItem.image&&<><div className="up-plus">＋</div><div className="up-hint">Upload Clothing Image</div><div style={{fontSize:"0.55rem",color:"#2e2a3a"}}>Screenshot from any site</div></>}
-                </div>
-                <input ref={itemRef} type="file" accept="image/*" style={{display:"none"}} onChange={onItem}/>
-                <div><div className="fld-l">What type of item?</div>
-                  <div className="cat-grid">{CATEGORY_OPTIONS.map(c=>(
-                    <button key={c.id} className={`cat-o ${newItem.category===c.id?"sel":""}`} onClick={()=>setNewItem(p=>({...p,category:c.id}))}>{c.icon} {c.label}</button>
-                  ))}</div>
-                </div>
-                <div><div className="fld-l">Where does it go?</div>
-                  <select className="s-sel" value={newItem.placement} onChange={e=>setNewItem(p=>({...p,placement:e.target.value}))}>
-                    {PLACEMENT_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <input className="s-inp" placeholder='Or type e.g. "left wrist" or "right ear"' value={newItem.customPlacement} onChange={e=>setNewItem(p=>({...p,customPlacement:e.target.value}))}/>
-                </div>
-                <button className="btn-p" onClick={saveItem} disabled={!newItem.image}>{editingId?"Update Item":"Add to Outfit"} ✦</button>
-              </div>
-            ):(
-              <button className="add-more" onClick={()=>setAddingItem(true)}>＋ {outfitItems.length>0?"Add Another Piece":"Add First Piece"}</button>
-            )}
-          </div>
-          {!addingItem&&outfitItems.length>0&&(
-            <div className="sticky">
-              <button className="gen-btn" onClick={handleGetFitted} disabled={isRendering||!userPhoto}>Get Fitted ✦</button>
-              <div className="gen-sub">{outfitItems.length} piece{outfitItems.length>1?"s":""} · {userPlan==="unlimited"?"∞ unlimited":<><em>{looksLeft}</em> render{looksLeft===1?"":"s"} left</>}</div>
+              <button className="btn-g" style={{marginTop:8}} onClick={()=>setShowPricing(false)}>Close</button>
             </div>
-          )}
-        </>
-      )}
-
-      {/* RESULT */}
-      {tab==="result"&&(
-        <div className="wrap">
-          <div className="res-frame">
-            {isRendering&&<div className="rend-ov"><div className="spin"/><div className="rend-txt">{renderStep||"Getting you fitted..."}</div></div>}
-            {(renderedLook||userPhoto)&&<img src={renderedLook||userPhoto} alt="Your look"/>}
-            {renderedLook&&<div className="res-badge">✦ Fitted</div>}
           </div>
-          {renderedLook&&(<>
-            <div className="res-acts">
-              <button className="res-act" onClick={()=>{const a=document.createElement('a');a.href=renderedLook;a.download='fitted-look.jpg';a.click();}}>↓ Save</button>
-              <button className="res-act">⤴ Share</button>
-              <button className="res-act" onClick={()=>{setRenderedLook(null);setOutfitItems([]);setTab("try");}}>↺ Reset</button>
+        )}
+
+        {/* PAYWALL */}
+        {showPaywall&&(
+          <div className="modal-bg" onClick={()=>setShowPaywall(false)}>
+            <div className="modal-box" onClick={e=>e.stopPropagation()}>
+              <div className="modal-handle"/>
+              <div className="modal-t">Free looks <em>used up.</em> 🖤</div>
+              <div className="modal-s">Keep going — pick how to continue.</div>
+              <div className="tier">{PACKS.map(p=><button key={p.id} className="pack-btn" onClick={()=>buy(p.looks)}><span>{p.label}</span><span style={{color:"#c8c0d8"}}>£{p.price}</span></button>)}</div>
+              <div className="div-txt">or</div>
+              <div className="tier feat"><div className="tier-h"><div className="tier-n">Go Unlimited</div><div className="tier-p">£9.99<small>/mo</small></div></div><div className="tier-d">Unlimited renders, priority speed.</div><button className="btn-c" style={{marginTop:12}} onClick={subscribe}>Unlock Unlimited ✦</button></div>
+              <button className="btn-g" style={{marginTop:8}} onClick={()=>setShowPaywall(false)}>Not now</button>
             </div>
-            <button className="back-btn" onClick={()=>setTab("try")}>← Edit Outfit</button>
-            <button className="btn-g" onClick={()=>setTab("reviews")}>Leave a Review ✦</button>
-          </>)}
-        </div>
-      )}
-
-      {/* FIND THIS FIT */}
-      {tab==="find"&&(
-        <div className="wrap">
-          <div><div className="eyebrow">✦ AI Outfit Detective</div><div className="sec-t">Find <em>This Fit</em></div></div>
-          <div style={{fontSize:"0.72rem",color:"#5a5070",lineHeight:1.85}}>Seen an influencer wearing something fire but they won't say where it's from? Upload the photo and AI will identify the clothing and tell you where to find it.</div>
-          <div className="ftf-up" onClick={()=>ftfRef.current?.click()}>
-            {ftfPhoto&&<img src={ftfPhoto} alt="Upload"/>}
-            <div className="ftf-up-ov"><div className="up-plus">＋</div><div className="up-hint">Change Photo</div></div>
-            {!ftfPhoto&&<><div style={{fontSize:"3rem",opacity:0.12}}>🔍</div><div className="up-hint">Upload Influencer Photo</div><div style={{fontSize:"0.56rem",color:"#2e2a3a"}}>Screenshot, saved photo, anything</div></>}
           </div>
-          <input ref={ftfRef} type="file" accept="image/*" style={{display:"none"}} onChange={onFtf}/>
-          {ftfPhoto&&!ftfResult&&<button className="btn-c" onClick={findThisFit} disabled={ftfLoading}>{ftfLoading?"Analysing Outfit...":"Find This Fit ✦"}</button>}
-          {ftfLoading&&<div style={{textAlign:"center",padding:"20px 0"}}><div className="spin" style={{margin:"0 auto 16px"}}/><div style={{fontSize:"0.56rem",letterSpacing:"3px",color:"#3a3550",textTransform:"uppercase"}}>Analysing the outfit...</div></div>}
-          {ftfResult&&!ftfResult.error&&(
-            <div>
-              {ftfResult.summary&&<div style={{fontSize:"0.78rem",color:"#8a8098",fontStyle:"italic",lineHeight:1.7,marginBottom:12}}>"{ftfResult.summary}"</div>}
-              {ftfResult.items?.map((item,i)=>(
-                <div key={i} className="ftf-res" style={{marginBottom:10}}>
-                  <div className="ftf-rt">{item.type}</div>
-                  <div className="ftf-rd">{item.description}</div>
-                  <div className="fld-l" style={{marginBottom:8}}>Could be from:</div>
-                  <div className="ftf-tags">{item.brands?.map((b,j)=><span key={j} className="ftf-tag">{b}</span>)}</div>
-                  {item.searchTerms?.length>0&&<><div className="fld-l" style={{marginTop:12,marginBottom:4}}>Search terms:</div><div style={{fontSize:"0.7rem",color:"#5a5070",lineHeight:2}}>{item.searchTerms.join(" · ")}</div></>}
-                </div>
-              ))}
-              <button className="btn-g" onClick={()=>{setFtfPhoto(null);setFtfResult(null);}}>Try Another Photo</button>
+        )}
+
+        {/* ACCOUNT MODAL */}
+        {showAccount&&(
+          <div className="modal-bg" onClick={()=>setShowAccount(false)}>
+            <div className="modal-box" onClick={e=>e.stopPropagation()}>
+              <div className="modal-handle"/>
+              {profile?.avatar_base64&&<img src={profile.avatar_base64} className="acct-avatar" alt="You"/>}
+              <div className="acct-name">Your <em style={{fontStyle:"italic",color:"#c8c0d8"}}>Profile</em></div>
+              <div className="acct-email">{user?.email}</div>
+              <button className="btn-p" style={{marginBottom:10}} onClick={()=>{setProfile(p=>({...p,avatar_base64:null}));setShowAccount(false);}}>Update Avatar Photo ✦</button>
+              <button className="btn-g" onClick={handleSignOut}>Sign Out</button>
             </div>
-          )}
-          {ftfResult?.error&&<div style={{textAlign:"center",fontSize:"0.7rem",color:"#5a5070"}}>Something went wrong. Please try again.</div>}
-        </div>
-      )}
-
-      {/* REVIEWS */}
-      {tab==="reviews"&&(
-        <div className="wrap">
-          <div><div className="eyebrow">✦ Community</div><div className="sec-t">Real <em>Reviews</em></div></div>
-          <div className="rev-form">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1rem"}}>Leave Your Review</div>
-            <div><div className="fld-l">Your Rating</div>
-              <div className="star-row">{[1,2,3,4,5].map(i=><button key={i} className="star-btn" onClick={()=>setNewRev(p=>({...p,stars:i}))}><span style={{color:i<=newRev.stars?"#c9a84c":"#1e1a2a",fontSize:"1.6rem"}}>★</span></button>)}</div>
-            </div>
-            <div><div className="fld-l">Your Review</div><textarea className="rev-ta" rows={4} placeholder="Tell others about your experience..." value={newRev.text} onChange={e=>setNewRev(p=>({...p,text:e.target.value}))}/></div>
-            <input className="s-inp" style={{marginTop:0}} placeholder="Your name" value={newRev.name} onChange={e=>setNewRev(p=>({...p,name:e.target.value}))}/>
-            {revErr&&<div className="err-txt">{revErr}</div>}
-            <button className="btn-p" onClick={submitReview} disabled={revSub}>{revSub?"Submitting...":"Submit Review ✦"}</button>
           </div>
-          <div className="chrome-line"/>
-          {reviews.length===0?<div className="no-rev">No reviews yet<br/>Be the first to share your experience</div>:reviews.map(r=>(
-            <div key={r.id} className="rev-card"><Stars count={r.stars}/><div className="rev-txt">"{r.text}"</div><span className="rev-auth">{r.name}</span><span className="rev-dt">{r.date}</span></div>
-          ))}
-        </div>
-      )}
-
-      {/* PRICING MODAL */}
-      {showPricing&&(
-        <div className="modal-bg" onClick={()=>setShowPricing(false)}>
-          <div className="modal-box" onClick={e=>e.stopPropagation()}>
-            <div className="modal-handle"/>
-            <div className="modal-t">Choose Your <em>Plan</em></div>
-            <div className="modal-s">Try free. Pay when you're obsessed.</div>
-            <div className="tier"><div className="tier-h"><div className="tier-n">Free</div><div className="tier-p">£0</div></div><div className="tier-d">3 looks, no card needed.</div></div>
-            <div className="tier"><div className="tier-h"><div className="tier-n">Pay Per Look</div><div className="tier-p">£1.49<small>/look</small></div></div><div className="tier-d">For occasional shoppers.</div>
-              {PACKS.map(p=><button key={p.id} className="pack-btn" onClick={()=>buy(p.looks)}><span>{p.label}</span><span style={{color:"#c8c0d8"}}>£{p.price}</span></button>)}
-            </div>
-            <div className="tier feat"><div className="tier-h"><div className="tier-n">Unlimited<span className="badge">Best</span></div><div className="tier-p">£9.99<small>/mo</small></div></div><div className="tier-d">For the fashion obsessed.</div>
-              <ul className="tier-perks"><li>Unlimited AI renders</li><li>Priority speed</li><li>Save & share looks</li><li>Find This Fit unlimited</li><li>Early access to features</li></ul>
-              <button className="btn-c" style={{marginTop:14}} onClick={subscribe}>Subscribe ✦</button>
-            </div>
-            <button className="btn-g" style={{marginTop:8}} onClick={()=>setShowPricing(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {/* PAYWALL */}
-      {showPaywall&&(
-        <div className="modal-bg" onClick={()=>setShowPaywall(false)}>
-          <div className="modal-box" onClick={e=>e.stopPropagation()}>
-            <div className="modal-handle"/>
-            <div className="modal-t">Free looks <em>used up.</em> 🖤</div>
-            <div className="modal-s">Keep going — pick how to continue.</div>
-            <div className="tier">{PACKS.map(p=><button key={p.id} className="pack-btn" onClick={()=>buy(p.looks)}><span>{p.label}</span><span style={{color:"#c8c0d8"}}>£{p.price}</span></button>)}</div>
-            <div className="div-txt">or</div>
-            <div className="tier feat"><div className="tier-h"><div className="tier-n">Go Unlimited</div><div className="tier-p">£9.99<small>/mo</small></div></div><div className="tier-d">Unlimited renders, priority speed.</div><button className="btn-c" style={{marginTop:12}} onClick={subscribe}>Unlock Unlimited ✦</button></div>
-            <button className="btn-g" style={{marginTop:8}} onClick={()=>setShowPaywall(false)}>Not now</button>
-          </div>
-        </div>
-      )}
-
-      {/* API KEY MODAL */}
-      {showApiModal&&(
-        <div className="modal-bg">
-          <div className="modal-box">
-            <div className="modal-handle"/>
-            <div className="modal-t">Connect <em>AI</em></div>
-            <div className="modal-s">Get your free API key from <a href="https://fashn.ai" target="_blank">fashn.ai</a> — paste it below to activate AI rendering.</div>
-            <input className="m-inp" type="password" placeholder="Paste your Fashn.ai API key..." value={apiKey} onChange={e=>setApiKey(e.target.value)}/>
-            <button className="btn-p" style={{marginBottom:10}} onClick={()=>{if(apiKey.trim()){setShowApiModal(false);generateLook();}}}>Activate & Render ✦</button>
-            <button className="btn-g" onClick={()=>setShowApiModal(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
 
