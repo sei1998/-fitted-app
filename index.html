@@ -29,7 +29,7 @@ const { useState, useRef, useEffect } = React;
 
 // ── SUPABASE ──
 const SUPABASE_URL = 'https://zwbusnhlhzagafoqxqzh.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_9wdZD_iOU_TXuE1fSb2Uqg_RrzhK2Y4';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const FREE_LIMIT = 3;
